@@ -1,0 +1,13 @@
+services:
+  db:
+    env_file:
+      - .env
+    container_name: api_db
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    image: postgres
+    ports:
+      - '${DB_PORT}:5432'
+    restart: 'always'
