@@ -1,12 +1,15 @@
 import { EntityManager } from '@mikro-orm/postgresql';
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuditLogOperation } from './audit-log-operation.enum';
-import { AUDITABLE_META_KEY } from './audit-log.decorators';
+import {
+  AUDIT_IGNORE_META_KEY,
+  AUDITABLE_META_KEY,
+} from './audit-log.decorators';
 import { AuditLogSubscriberFactory } from './audit-log.subscriber-factory';
 
 @Injectable()
-export class AuditLogExplorer implements OnModuleInit {
+export class AuditLogExplorer {
   constructor(
     private reflector: Reflector,
     private entityManager: EntityManager,
@@ -15,7 +18,7 @@ export class AuditLogExplorer implements OnModuleInit {
 
   private readonly logger = new Logger('AuditLogModule');
 
-  onModuleInit() {
+  registerAuditableEntitiesSubscribers() {
     this.logger.log('Beginning discovery of auditable entities');
 
     const allMetadata = Object.values(
@@ -32,10 +35,22 @@ export class AuditLogExplorer implements OnModuleInit {
         continue;
       }
 
+      const ignoredFields = meta.props
+        .filter(
+          (field) =>
+            !!Reflect.getMetadata(
+              AUDIT_IGNORE_META_KEY,
+              meta.class.prototype,
+              field.name,
+            ),
+        )
+        .map((field) => field.name);
+
       this.logger.log(`Setting up audit subscriber for entity ${meta.name}`);
       this.entityManager.getEventManager().registerSubscriber(
         this.subscriberFactory.makeSubscriber(meta, {
           operations: auditOperations,
+          ignoredFields,
         }),
       );
     }

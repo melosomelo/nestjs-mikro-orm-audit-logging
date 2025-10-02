@@ -5,6 +5,7 @@ import { AuditLog } from './audit-log.entity';
 
 interface MakeAuditLogSubscriberOptions {
   operations: AuditLogOperation[];
+  ignoredFields: string[];
 }
 
 @Injectable()
@@ -18,31 +19,38 @@ export class AuditLogSubscriberFactory {
     };
 
     if (opts.operations.includes(AuditLogOperation.Create)) {
-      subscriber.afterCreate = this.afterCreateHandler.bind(
-        subscriber,
-      ) as EventSubscriber<T>['afterCreate'];
+      subscriber.afterCreate = ((args) =>
+        this.afterCreateHandler(
+          args,
+          opts.ignoredFields,
+        )) as EventSubscriber<T>['afterCreate'];
     }
 
     return subscriber;
   }
 
-  private async afterCreateHandler<T extends object>(args: EventArgs<T>) {
+  private async afterCreateHandler<T extends object>(
+    args: EventArgs<T>,
+    ignoredFields: string[],
+  ) {
     const { em, meta, entity } = args;
 
     const stringifiedPrimaryKey = meta.primaryKeys
       .map((key) => String(entity[key]))
       .join(',');
 
-    const diff = Object.entries(entity).reduce(
-      (prev, [key, value]) => {
-        prev[key] = {
-          old: null,
-          new: value as unknown,
-        };
-        return prev;
-      },
-      {} as NonNullable<AuditLog['diff']>,
-    );
+    const diff = Object.entries(entity)
+      .filter(([key]) => !ignoredFields.includes(key))
+      .reduce(
+        (prev, [key, value]) => {
+          prev[key] = {
+            old: null,
+            new: value as unknown,
+          };
+          return prev;
+        },
+        {} as NonNullable<AuditLog['diff']>,
+      );
 
     await em.insert(AuditLog, {
       tableName: meta.tableName,

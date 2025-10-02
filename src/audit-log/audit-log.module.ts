@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { AuditLogExplorer } from './audit-log.explorer';
 import { AuditLogSubscriberFactory } from './audit-log.subscriber-factory';
 
@@ -8,4 +8,10 @@ import { AuditLogSubscriberFactory } from './audit-log.subscriber-factory';
   imports: [],
   providers: [AuditLogExplorer, AuditLogSubscriberFactory],
 })
-export class AuditLogModule {}
+export class AuditLogModule implements OnModuleInit {
+  constructor(private auditLogExplorer: AuditLogExplorer) {}
+
+  onModuleInit() {
+    this.auditLogExplorer.registerAuditableEntitiesSubscribers();
+  }
+}

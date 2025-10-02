@@ -6,7 +6,10 @@ import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogOperation } from './audit-log-operation.enum';
-import { AUDITABLE_META_KEY } from './audit-log.decorators';
+import {
+  AUDIT_IGNORE_META_KEY,
+  AUDITABLE_META_KEY,
+} from './audit-log.decorators';
 import { AuditLog } from './audit-log.entity';
 import { AuditLogModule } from './audit-log.module';
 
@@ -20,6 +23,12 @@ Reflect.defineMetadata(
     AuditLogOperation.Delete,
   ],
   AuditableUser,
+);
+Reflect.defineMetadata(
+  AUDIT_IGNORE_META_KEY,
+  true,
+  AuditableUser.prototype,
+  'password',
 );
 
 describe('Audit Logging', () => {
@@ -56,7 +65,7 @@ describe('Audit Logging', () => {
     await mod.close();
   });
 
-  it('should properly create a create audit log operation', async () => {
+  it('should properly create a create audit log operation w/ field ignoring', async () => {
     const newUser = await userRepository.create(userFactory.makeOne());
 
     const em = entityManager.fork();
@@ -74,10 +83,6 @@ describe('Audit Logging', () => {
       username: {
         old: null,
         new: newUser.username,
-      },
-      password: {
-        old: null,
-        new: newUser.password,
       },
     });
   });
