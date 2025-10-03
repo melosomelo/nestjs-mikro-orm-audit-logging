@@ -124,4 +124,23 @@ describe('Audit Logging', () => {
     expect(logInstance.diff).toBe(null);
     expect(logInstance.user?.get().id).toBe(contextUser.id);
   });
+
+  it('should properly create a read audit log operation', async () => {
+    const { id } = await userRepository.create(userFactory.makeOne());
+    await userRepository.findOneByPk(id);
+
+    const em = entityManager.fork();
+    const logInstance = await em.findOneOrFail(
+      AuditLog,
+      {
+        tableName: userTableName,
+        recordId: id.toString(),
+        operation: AuditLogOperation.Read,
+      },
+      { populate: ['user'] },
+    );
+    expect(logInstance.createdAt).not.toBe(null);
+    expect(logInstance.diff).toBe(null);
+    expect(logInstance.user?.get().id).toBe(contextUser.id);
+  });
 });

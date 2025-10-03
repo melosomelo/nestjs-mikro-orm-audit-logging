@@ -35,6 +35,12 @@ export class AuditLogSubscriberFactory {
               args,
             )) as EventSubscriber<T>['afterDelete'];
           break;
+        case AuditLogOperation.Read:
+          subscriber.onLoad = ((args) =>
+            this.auditLogHandler.afterReadHandler(
+              args,
+            )) as EventSubscriber<T>['onLoad'];
+          break;
       }
     });
 

@@ -48,6 +48,17 @@ export class AuditLogHandlerRegistry {
     });
   }
 
+  async afterReadHandler<T extends object>(args: EventArgs<T>) {
+    const { em, entity, meta } = args;
+    await em.insert(AuditLog, {
+      tableName: meta.tableName,
+      recordId: this.stringifyEntityPk(entity, meta),
+      operation: AuditLogOperation.Read,
+      user: this.contextService.currentUser?.id,
+      diff: null,
+    });
+  }
+
   private stringifyEntityPk<T extends object>(
     entity: T,
     metadata: EntityMetadata<T>,
