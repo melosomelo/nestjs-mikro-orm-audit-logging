@@ -1,4 +1,12 @@
-import { Entity, Opt, PrimaryKey, Property } from '@mikro-orm/core';
+import { User } from '@/user/user.entity';
+import {
+  Entity,
+  ManyToOne,
+  Opt,
+  PrimaryKey,
+  Property,
+  Ref,
+} from '@mikro-orm/core';
 import { AuditLogOperation } from './audit-log-operation.enum';
 
 @Entity()
@@ -12,7 +20,7 @@ export class AuditLog {
   @Property()
   recordId: string;
 
-  @Property()
+  @Property({ type: 'varchar' })
   operation: AuditLogOperation;
 
   @Property({ type: 'json' })
@@ -20,4 +28,7 @@ export class AuditLog {
 
   @Property({ type: 'timestamptz', defaultRaw: 'NOW()' })
   createdAt: Date & Opt;
+
+  @ManyToOne()
+  user: Ref<User> | null;
 }

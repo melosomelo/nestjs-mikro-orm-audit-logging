@@ -25,34 +25,39 @@ export class AuditLogExplorer {
       this.entityManager.getMetadata().getAll(),
     );
 
-    for (const meta of allMetadata) {
+    for (const entityMetadata of allMetadata) {
       const auditOperations = this.reflector.get<
         AuditLogOperation[] | undefined
-      >(AUDITABLE_META_KEY, meta.class);
+      >(AUDITABLE_META_KEY, entityMetadata.class);
       const isAuditable = auditOperations !== undefined;
 
       if (!isAuditable) {
         continue;
       }
 
-      const ignoredFields = meta.props
-        .filter(
-          (field) =>
-            !!Reflect.getMetadata(
-              AUDIT_IGNORE_META_KEY,
-              meta.class.prototype,
-              field.name,
-            ),
-        )
+      const ignoredFields = entityMetadata.props
+        .filter((field) => {
+          const shouldIgnore = !!Reflect.getMetadata(
+            AUDIT_IGNORE_META_KEY,
+            entityMetadata.class.prototype,
+            field.name,
+          );
+          return shouldIgnore;
+        })
         .map((field) => field.name);
 
-      this.logger.log(`Setting up audit subscriber for entity ${meta.name}`);
-      this.entityManager.getEventManager().registerSubscriber(
-        this.subscriberFactory.makeSubscriber(meta, {
+      this.logger.log(
+        `Setting up audit subscriber for entity ${entityMetadata.name}`,
+      );
+
+      const entitySubscriber = this.subscriberFactory.makeSubscriber(
+        entityMetadata,
+        {
           operations: auditOperations,
           ignoredFields,
-        }),
+        },
       );
+      this.entityManager.getEventManager().registerSubscriber(entitySubscriber);
     }
   }
 }

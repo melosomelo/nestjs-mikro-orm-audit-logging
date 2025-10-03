@@ -1,3 +1,4 @@
+import { ContextService } from '@/context/context.service';
 import { EntityMetadata, EventArgs, EventSubscriber } from '@mikro-orm/core';
 import { Injectable } from '@nestjs/common';
 import { AuditLogOperation } from './audit-log-operation.enum';
@@ -10,6 +11,8 @@ interface MakeAuditLogSubscriberOptions {
 
 @Injectable()
 export class AuditLogSubscriberFactory {
+  constructor(private contextService: ContextService) {}
+
   makeSubscriber<T extends object>(
     entityMetadata: EntityMetadata<T>,
     opts: MakeAuditLogSubscriberOptions,
@@ -40,7 +43,7 @@ export class AuditLogSubscriberFactory {
       .join(',');
 
     const diff = Object.entries(entity)
-      .filter(([key]) => !ignoredFields.includes(key))
+      .filter(([fieldName]) => !ignoredFields.includes(fieldName))
       .reduce(
         (prev, [key, value]) => {
           prev[key] = {

@@ -1,3 +1,5 @@
+import { ContextModule } from '@/context/context.module';
+import { ContextService } from '@/context/context.service';
 import ormConfig from '@/database/orm.config';
 import { User } from '@/user/user.entity';
 import { UserFactory } from '@/user/user.factory';
@@ -37,6 +39,7 @@ describe('Audit Logging', () => {
   let userRepository: UserRepository;
   let userFactory: UserFactory;
   let userTableName: string;
+  let user: User;
 
   beforeAll(async () => {
     mod = await Test.createTestingModule({
@@ -50,13 +53,24 @@ describe('Audit Logging', () => {
           entities: [AuditableUser, AuditLog],
         }),
         AuditLogModule,
+        ContextModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(ContextService)
+      .useValue({
+        get currentUser() {
+          return {
+            id: user.id,
+          };
+        },
+      })
+      .compile();
 
     entityManager = mod.get(EntityManager);
     userRepository = mod.get(UserRepository);
     userFactory = new UserFactory(entityManager.fork());
     userTableName = mod.get(MikroORM).getMetadata().get(User).tableName;
+    user = await userFactory.createOne();
 
     await mod.init();
   });
