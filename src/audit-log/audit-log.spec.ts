@@ -39,7 +39,7 @@ describe('Audit Logging', () => {
   let userRepository: UserRepository;
   let userFactory: UserFactory;
   let userTableName: string;
-  let user: User;
+  let contextUser: User;
 
   beforeAll(async () => {
     mod = await Test.createTestingModule({
@@ -60,7 +60,7 @@ describe('Audit Logging', () => {
       .useValue({
         get currentUser() {
           return {
-            id: user.id,
+            id: contextUser.id,
           };
         },
       })
@@ -70,7 +70,7 @@ describe('Audit Logging', () => {
     userRepository = mod.get(UserRepository);
     userFactory = new UserFactory(entityManager.fork());
     userTableName = mod.get(MikroORM).getMetadata().get(User).tableName;
-    user = await userFactory.createOne();
+    contextUser = await userFactory.createOne();
 
     await mod.init();
   });
@@ -83,11 +83,15 @@ describe('Audit Logging', () => {
     const newUser = await userRepository.create(userFactory.makeOne());
 
     const em = entityManager.fork();
-    const logInstance = await em.findOneOrFail(AuditLog, {
-      tableName: userTableName,
-      recordId: newUser.id.toString(),
-      operation: AuditLogOperation.Create,
-    });
+    const logInstance = await em.findOneOrFail(
+      AuditLog,
+      {
+        tableName: userTableName,
+        recordId: newUser.id.toString(),
+        operation: AuditLogOperation.Create,
+      },
+      { populate: ['user'] },
+    );
     expect(logInstance.createdAt).not.toBe(null);
     expect(logInstance.diff).toEqual({
       id: {
@@ -99,5 +103,6 @@ describe('Audit Logging', () => {
         new: newUser.username,
       },
     });
+    expect(logInstance.user?.get().id).toBe(contextUser.id);
   });
 });

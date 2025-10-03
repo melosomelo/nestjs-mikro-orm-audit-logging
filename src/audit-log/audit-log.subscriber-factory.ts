@@ -60,6 +60,7 @@ export class AuditLogSubscriberFactory {
       recordId: stringifiedPrimaryKey,
       operation: AuditLogOperation.Create,
       diff,
+      user: this.contextService.currentUser?.id,
     });
   }
 }
