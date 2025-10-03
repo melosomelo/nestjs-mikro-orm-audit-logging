@@ -59,6 +59,35 @@ export class AuditLogHandlerRegistry {
     });
   }
 
+  async afterUpdateHandler<T extends object>(
+    args: EventArgs<T>,
+    ignoredFields: string[],
+  ) {
+    const { em, meta, entity } = args;
+    const changeSet = args.changeSet!;
+
+    const diff = Object.entries(changeSet.payload)
+      .filter(([fieldName]) => !ignoredFields.includes(fieldName))
+      .reduce(
+        (acc, [fieldName, newValue]) => {
+          acc[fieldName] = {
+            old: (changeSet.originalEntity as T)[fieldName],
+            new: newValue as unknown,
+          };
+          return acc;
+        },
+        {} as NonNullable<AuditLog['diff']>,
+      );
+
+    await em.insert(AuditLog, {
+      tableName: meta.tableName,
+      recordId: this.stringifyEntityPk(entity, meta),
+      operation: AuditLogOperation.Update,
+      diff,
+      user: this.contextService.currentUser?.id,
+    });
+  }
+
   private stringifyEntityPk<T extends object>(
     entity: T,
     metadata: EntityMetadata<T>,

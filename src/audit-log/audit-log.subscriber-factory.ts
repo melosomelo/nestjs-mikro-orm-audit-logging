@@ -41,6 +41,13 @@ export class AuditLogSubscriberFactory {
               args,
             )) as EventSubscriber<T>['onLoad'];
           break;
+        case AuditLogOperation.Update:
+          subscriber.afterUpdate = ((args) =>
+            this.auditLogHandler.afterUpdateHandler(
+              args,
+              opts.ignoredFields,
+            )) as EventSubscriber<T>['afterUpdate'];
+          break;
       }
     });
 

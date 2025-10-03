@@ -140,7 +140,35 @@ describe('Audit Logging', () => {
       { populate: ['user'] },
     );
     expect(logInstance.createdAt).not.toBe(null);
-    expect(logInstance.diff).toBe(null);
     expect(logInstance.user?.get().id).toBe(contextUser.id);
+    expect(logInstance.diff).toBe(null);
+  });
+
+  it('should properly create an edit audit log operation', async () => {
+    const newUser = await userRepository.create(userFactory.makeOne());
+    const newUsername = `${newUser.username}${Date.now()}`;
+    await userRepository.update(newUser.id, {
+      username: newUsername,
+      password: `${newUser.password}${Date.now()}`,
+    });
+
+    const em = entityManager.fork();
+    const logInstance = await em.findOneOrFail(
+      AuditLog,
+      {
+        tableName: userTableName,
+        recordId: newUser.id.toString(),
+        operation: AuditLogOperation.Update,
+      },
+      { populate: ['user'] },
+    );
+    expect(logInstance.createdAt).not.toBe(null);
+    expect(logInstance.user?.get().id).toBe(contextUser.id);
+    expect(logInstance.diff).toEqual({
+      username: {
+        old: newUser.username,
+        new: newUsername,
+      },
+    });
   });
 });
