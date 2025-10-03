@@ -1,8 +1,7 @@
-import { ContextService } from '@/context/context.service';
-import { EntityMetadata, EventArgs, EventSubscriber } from '@mikro-orm/core';
+import { EntityMetadata, EventSubscriber } from '@mikro-orm/core';
 import { Injectable } from '@nestjs/common';
 import { AuditLogOperation } from './audit-log-operation.enum';
-import { AuditLog } from './audit-log.entity';
+import { AuditLogHandlerRegistry } from './audit-log.handler-registry';
 
 interface MakeAuditLogSubscriberOptions {
   operations: AuditLogOperation[];
@@ -11,7 +10,7 @@ interface MakeAuditLogSubscriberOptions {
 
 @Injectable()
 export class AuditLogSubscriberFactory {
-  constructor(private contextService: ContextService) {}
+  constructor(private auditLogHandler: AuditLogHandlerRegistry) {}
 
   makeSubscriber<T extends object>(
     entityMetadata: EntityMetadata<T>,
@@ -23,44 +22,12 @@ export class AuditLogSubscriberFactory {
 
     if (opts.operations.includes(AuditLogOperation.Create)) {
       subscriber.afterCreate = ((args) =>
-        this.afterCreateHandler(
+        this.auditLogHandler.afterCreateHandler(
           args,
           opts.ignoredFields,
         )) as EventSubscriber<T>['afterCreate'];
     }
 
     return subscriber;
-  }
-
-  private async afterCreateHandler<T extends object>(
-    args: EventArgs<T>,
-    ignoredFields: string[],
-  ) {
-    const { em, meta, entity } = args;
-
-    const stringifiedPrimaryKey = meta.primaryKeys
-      .map((key) => String(entity[key]))
-      .join(',');
-
-    const diff = Object.entries(entity)
-      .filter(([fieldName]) => !ignoredFields.includes(fieldName))
-      .reduce(
-        (prev, [key, value]) => {
-          prev[key] = {
-            old: null,
-            new: value as unknown,
-          };
-          return prev;
-        },
-        {} as NonNullable<AuditLog['diff']>,
-      );
-
-    await em.insert(AuditLog, {
-      tableName: meta.tableName,
-      recordId: stringifiedPrimaryKey,
-      operation: AuditLogOperation.Create,
-      diff,
-      user: this.contextService.currentUser?.id,
-    });
   }
 }
