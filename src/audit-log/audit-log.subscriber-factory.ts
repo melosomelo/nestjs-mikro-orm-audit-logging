@@ -20,13 +20,23 @@ export class AuditLogSubscriberFactory {
       getSubscribedEntities: () => [entityMetadata.name as string],
     };
 
-    if (opts.operations.includes(AuditLogOperation.Create)) {
-      subscriber.afterCreate = ((args) =>
-        this.auditLogHandler.afterCreateHandler(
-          args,
-          opts.ignoredFields,
-        )) as EventSubscriber<T>['afterCreate'];
-    }
+    opts.operations.forEach((op) => {
+      switch (op) {
+        case AuditLogOperation.Create:
+          subscriber.afterCreate = ((args) =>
+            this.auditLogHandler.afterCreateHandler(
+              args,
+              opts.ignoredFields,
+            )) as EventSubscriber<T>['afterCreate'];
+          break;
+        case AuditLogOperation.Delete:
+          subscriber.afterDelete = ((args) =>
+            this.auditLogHandler.afterDeleteHandler(
+              args,
+            )) as EventSubscriber<T>['afterDelete'];
+          break;
+      }
+    });
 
     return subscriber;
   }

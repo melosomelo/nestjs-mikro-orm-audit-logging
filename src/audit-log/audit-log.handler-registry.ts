@@ -1,5 +1,5 @@
 import { ContextService } from '@/context/context.service';
-import { EventArgs } from '@mikro-orm/core';
+import { EntityMetadata, EventArgs } from '@mikro-orm/core';
 import { Injectable } from '@nestjs/common';
 import { AuditLogOperation } from './audit-log-operation.enum';
 import { AuditLog } from './audit-log.entity';
@@ -13,10 +13,6 @@ export class AuditLogHandlerRegistry {
     ignoredFields: string[],
   ) {
     const { em, meta, entity } = args;
-
-    const stringifiedPrimaryKey = meta.primaryKeys
-      .map((key) => String(entity[key]))
-      .join(',');
 
     const diff = Object.entries(entity)
       .filter(([fieldName]) => !ignoredFields.includes(fieldName))
@@ -33,10 +29,29 @@ export class AuditLogHandlerRegistry {
 
     await em.insert(AuditLog, {
       tableName: meta.tableName,
-      recordId: stringifiedPrimaryKey,
+      recordId: this.stringifyEntityPk(entity, meta),
       operation: AuditLogOperation.Create,
       diff,
       user: this.contextService.currentUser?.id,
     });
+  }
+
+  async afterDeleteHandler<T extends object>(args: EventArgs<T>) {
+    const { em, entity, meta } = args;
+
+    await em.insert(AuditLog, {
+      tableName: meta.tableName,
+      recordId: this.stringifyEntityPk(entity, meta),
+      operation: AuditLogOperation.Delete,
+      user: this.contextService.currentUser?.id,
+      diff: null,
+    });
+  }
+
+  private stringifyEntityPk<T extends object>(
+    entity: T,
+    metadata: EntityMetadata<T>,
+  ) {
+    return metadata.primaryKeys.map((key) => String(entity[key])).join(',');
   }
 }
