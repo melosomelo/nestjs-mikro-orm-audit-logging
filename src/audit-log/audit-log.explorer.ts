@@ -39,7 +39,7 @@ export class AuditLogExplorer {
         .filter((field) => {
           const shouldIgnore = !!Reflect.getMetadata(
             AUDIT_IGNORE_META_KEY,
-            entityMetadata.class.prototype,
+            entityMetadata.class.prototype as object,
             field.name,
           );
           return shouldIgnore;

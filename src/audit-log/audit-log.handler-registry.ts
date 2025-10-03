@@ -71,7 +71,7 @@ export class AuditLogHandlerRegistry {
       .reduce(
         (acc, [fieldName, newValue]) => {
           acc[fieldName] = {
-            old: (changeSet.originalEntity as T)[fieldName],
+            old: (changeSet.originalEntity as T)[fieldName] as unknown,
             new: newValue as unknown,
           };
           return acc;

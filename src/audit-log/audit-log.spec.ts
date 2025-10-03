@@ -79,7 +79,7 @@ describe('Audit Logging', () => {
     await mod.close();
   });
 
-  it('should properly create a create audit log operation w/ field ignoring', async () => {
+  it('should properly create a create audit log operation', async () => {
     const newUser = await userRepository.create(userFactory.makeOne());
 
     const em = entityManager.fork();
