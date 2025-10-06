@@ -3,30 +3,24 @@ import { Injectable } from '@nestjs/common';
 import { AuditLogOperation } from './audit-log-operation.enum';
 import { AuditLogHandlerRegistry } from './audit-log.handler-registry';
 
-interface MakeAuditLogSubscriberOptions {
-  operations: AuditLogOperation[];
-  ignoredFields: string[];
-}
-
 @Injectable()
 export class AuditLogSubscriberFactory {
   constructor(private auditLogHandler: AuditLogHandlerRegistry) {}
 
   makeSubscriber<T extends object>(
     entityMetadata: EntityMetadata<T>,
-    opts: MakeAuditLogSubscriberOptions,
+    operations: AuditLogOperation[],
   ): EventSubscriber<T> {
     const subscriber: EventSubscriber<T> = {
       getSubscribedEntities: () => [entityMetadata.name as string],
     };
 
-    opts.operations.forEach((op) => {
+    operations.forEach((op) => {
       switch (op) {
         case AuditLogOperation.Create:
           subscriber.afterCreate = ((args) =>
             this.auditLogHandler.afterCreateHandler(
               args,
-              opts.ignoredFields,
             )) as EventSubscriber<T>['afterCreate'];
           break;
         case AuditLogOperation.Delete:
@@ -45,7 +39,6 @@ export class AuditLogSubscriberFactory {
           subscriber.afterUpdate = ((args) =>
             this.auditLogHandler.afterUpdateHandler(
               args,
-              opts.ignoredFields,
             )) as EventSubscriber<T>['afterUpdate'];
           break;
       }

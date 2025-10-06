@@ -14,8 +14,8 @@ export default defineConfig({
   password: env.DB_PASSWORD,
   dbName: env.DB_NAME,
   metadataProvider: TsMorphMetadataProvider,
-  entitiesTs: ['./src/**/*.entity.ts'],
-  entities: ['./dist/**/*.entity.js'],
+  entitiesTs: ['./src/**/*.entity.ts', './src/**/*.embeddable.ts'],
+  entities: ['./dist/**/*.entity.js', './dist/**/*.embeddable.js'],
   discovery: {
     warnWhenNoEntities: false,
   },

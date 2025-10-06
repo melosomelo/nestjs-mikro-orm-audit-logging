@@ -1,31 +1,29 @@
 import { ContextService } from '@/context/context.service';
-import { EntityMetadata, EventArgs } from '@mikro-orm/core';
+import {
+  EntityMetadata,
+  EntityProperty,
+  EventArgs,
+  ReferenceKind,
+  RequiredEntityData,
+} from '@mikro-orm/core';
 import { Injectable } from '@nestjs/common';
+import _ from 'lodash';
 import { AuditLogOperation } from './audit-log-operation.enum';
+import { AUDIT_IGNORE_META_KEY } from './audit-log.decorators';
 import { AuditLog } from './audit-log.entity';
 
 @Injectable()
 export class AuditLogHandlerRegistry {
   constructor(private contextService: ContextService) {}
 
-  async afterCreateHandler<T extends object>(
-    args: EventArgs<T>,
-    ignoredFields: string[],
-  ) {
+  async afterCreateHandler<T extends object>(args: EventArgs<T>) {
     const { em, meta, entity } = args;
 
-    const diff = Object.entries(entity)
-      .filter(([fieldName]) => !ignoredFields.includes(fieldName))
-      .reduce(
-        (prev, [key, value]) => {
-          prev[key] = {
-            old: null,
-            new: value as unknown,
-          };
-          return prev;
-        },
-        {} as NonNullable<AuditLog['diff']>,
-      );
+    const diff = this.buildDiff<T>({
+      before: null,
+      after: entity,
+      entityMetadata: meta,
+    });
 
     await em.insert(AuditLog, {
       tableName: meta.tableName,
@@ -59,25 +57,17 @@ export class AuditLogHandlerRegistry {
     });
   }
 
-  async afterUpdateHandler<T extends object>(
-    args: EventArgs<T>,
-    ignoredFields: string[],
-  ) {
+  async afterUpdateHandler<T extends object>(args: EventArgs<T>) {
     const { em, meta, entity } = args;
     const changeSet = args.changeSet!;
 
-    const diff = Object.entries(changeSet.payload)
-      .filter(([fieldName]) => !ignoredFields.includes(fieldName))
-      .reduce(
-        (acc, [fieldName, newValue]) => {
-          acc[fieldName] = {
-            old: (changeSet.originalEntity as T)[fieldName] as unknown,
-            new: newValue as unknown,
-          };
-          return acc;
-        },
-        {} as NonNullable<AuditLog['diff']>,
-      );
+    const diff = this.buildDiff<T>({
+      before: em
+        .fork()
+        .create(meta.class, changeSet.originalEntity as RequiredEntityData<T>),
+      after: entity,
+      entityMetadata: meta,
+    });
 
     await em.insert(AuditLog, {
       tableName: meta.tableName,
@@ -88,10 +78,84 @@ export class AuditLogHandlerRegistry {
     });
   }
 
+  private buildDiff<T extends object>({
+    before,
+    after,
+    entityMetadata,
+  }: {
+    before: T | null;
+    after: T | null;
+    entityMetadata: EntityMetadata<T>;
+  }) {
+    return entityMetadata.props
+      .filter((property) => !this.shouldIgnoreField(entityMetadata, property))
+      .reduce(
+        (acc, property) => {
+          const propertyPath = property.embedded
+            ? property.embedded
+            : [property.name];
+          const propDiffKey = propertyPath.join('.');
+          const oldValue = before ? _.get(before, propertyPath, null) : null;
+          const newValue = after ? _.get(after, propertyPath, null) : null;
+          if (oldValue !== newValue) {
+            acc[propDiffKey] = {
+              old: oldValue,
+              new: newValue,
+            };
+          }
+          return acc;
+        },
+        {} as NonNullable<AuditLog['diff']>,
+      );
+  }
+
   private stringifyEntityPk<T extends object>(
     entity: T,
     metadata: EntityMetadata<T>,
   ) {
     return metadata.primaryKeys.map((key) => String(entity[key])).join(',');
+  }
+
+  private shouldIgnoreField<T extends object>(
+    entityMetadata: EntityMetadata<T>,
+    propertyMetadata: EntityProperty<T, any>,
+  ) {
+    // We ignore the embedded fields. We want to deal with their properties directly.
+    const isEmbeddedField = propertyMetadata.kind === ReferenceKind.EMBEDDED;
+    if (isEmbeddedField) {
+      return true;
+    }
+
+    const isEmbeddedChildProperty =
+      propertyMetadata.kind === ReferenceKind.SCALAR &&
+      propertyMetadata.embedded;
+    if (isEmbeddedChildProperty) {
+      const [topLevelEmbeddedPropertyName, childEmbeddedPropertyName] =
+        propertyMetadata.embedded!;
+      const { embeddable: EmbeddableClass } =
+        entityMetadata.properties[topLevelEmbeddedPropertyName];
+
+      const parentEmbeddableHasAuditIgnore = !!Reflect.getMetadata(
+        AUDIT_IGNORE_META_KEY,
+        entityMetadata.class.prototype as object,
+        topLevelEmbeddedPropertyName,
+      );
+      const fieldHasAuditIgnore = !!Reflect.getMetadata(
+        AUDIT_IGNORE_META_KEY,
+        EmbeddableClass.prototype as object,
+        childEmbeddedPropertyName,
+      );
+
+      return parentEmbeddableHasAuditIgnore || fieldHasAuditIgnore;
+    }
+
+    const hasAuditIgnore =
+      propertyMetadata.kind === ReferenceKind.SCALAR &&
+      !!Reflect.getMetadata(
+        AUDIT_IGNORE_META_KEY,
+        entityMetadata.class.prototype as object,
+        propertyMetadata.name,
+      );
+    return hasAuditIgnore;
   }
 }

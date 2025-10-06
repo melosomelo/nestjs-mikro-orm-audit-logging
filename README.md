@@ -31,6 +31,9 @@ This is essential for:
 - **Ignore sensitive fields** → exclude things like passwords with `@AuditIgnore()`
 - **Automatic user attribution** → powered by a `ContextModule` built on **AsyncLocalStorage**
 - **Structured audit entries** → logs stored in a dedicated table with full details
+- **Support for `@Embeddable` fields** → embedded objects are audited like regular entity fields
+- **Fine-grained ignore control** → you can `@AuditIgnore()` an entire embedded field _or_ specific subfields within it
+- ⚠️ **Note:** Support for **nested embeddables** (embeddables that themselves contain other embeddables) has **not yet been tested**
 
 ---
 
@@ -91,6 +94,71 @@ export class User {
 }
 ```
 
+### 4. Auditing Embeddables
+
+Embeddable fields are supported — changes to their properties are tracked automatically and appear in audit diffs like regular properties.
+
+```ts
+@Embeddable()
+export class Address {
+  @Property()
+  street: string;
+
+  @Property()
+  city: string;
+
+  @Property()
+  country: string;
+}
+
+@Entity()
+@Auditable()
+export class Customer {
+  @PrimaryKey()
+  id: number;
+
+  @Embedded(() => Address)
+  address: Address;
+}
+```
+
+Changes within `address` (for example, `address.city`) will appear in the audit log diff just like top-level properties.
+
+#### 🔒 Ignoring Embedded Fields
+
+You can ignore an entire embedded field:
+
+```ts
+@Entity()
+export class Customer {
+  @PrimaryKey()
+  id: number;
+
+  @Embedded(() => Address)
+  @AuditIgnore() // Ignores all address subfields
+  address: Address;
+}
+```
+
+Or ignore specific subfields within an embeddable:
+
+```ts
+@Embeddable()
+export class Address {
+  @Property()
+  @AuditIgnore() // Only this field is ignored
+  street: string;
+
+  @Property()
+  city: string;
+
+  @Property()
+  country: string;
+}
+```
+
+> ⚠️ **Note:** Nested embeddables (embeddables containing other embeddables) are currently **not tested**.
+
 ---
 
 ## 📊 Example Audit Log Entry
@@ -104,7 +172,8 @@ Based on the `AuditLog` entity:
   "recordId": "42",
   "operation": "UPDATE",
   "diff": {
-    "email": { "old": "old@mail.com", "new": "new@mail.com" }
+    "email": { "old": "old@mail.com", "new": "new@mail.com" },
+    "address.city": { "old": "Paris", "new": "Berlin" }
   },
   "createdAt": "2025-10-03T14:12:00Z",
   "user": {
@@ -122,5 +191,5 @@ This project is ideal when you need:
 
 - Transparent **audit trails** for compliance or debugging
 - **Minimal boilerplate** logging (just decorators)
-- Fine-grained control: **choose operations, ignore fields, capture user context**
+- Fine-grained control: **choose operations, ignore fields or embedded subfields, capture user context**
 - Reliable **request-scoped context** backed by **AsyncLocalStorage**

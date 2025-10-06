@@ -2,10 +2,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import { Injectable, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuditLogOperation } from './audit-log-operation.enum';
-import {
-  AUDIT_IGNORE_META_KEY,
-  AUDITABLE_META_KEY,
-} from './audit-log.decorators';
+import { AUDITABLE_META_KEY } from './audit-log.decorators';
 import { AuditLogSubscriberFactory } from './audit-log.subscriber-factory';
 
 @Injectable()
@@ -35,27 +32,13 @@ export class AuditLogExplorer {
         continue;
       }
 
-      const ignoredFields = entityMetadata.props
-        .filter((field) => {
-          const shouldIgnore = !!Reflect.getMetadata(
-            AUDIT_IGNORE_META_KEY,
-            entityMetadata.class.prototype as object,
-            field.name,
-          );
-          return shouldIgnore;
-        })
-        .map((field) => field.name);
-
       this.logger.log(
         `Setting up audit subscriber for entity ${entityMetadata.name}`,
       );
 
       const entitySubscriber = this.subscriberFactory.makeSubscriber(
         entityMetadata,
-        {
-          operations: auditOperations,
-          ignoredFields,
-        },
+        auditOperations,
       );
       this.entityManager.getEventManager().registerSubscriber(entitySubscriber);
     }

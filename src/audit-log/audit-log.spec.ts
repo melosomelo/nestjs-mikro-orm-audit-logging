@@ -1,6 +1,7 @@
 import { ContextModule } from '@/context/context.module';
 import { ContextService } from '@/context/context.service';
 import ormConfig from '@/database/orm.config';
+import { Address } from '@/shared/embeddables/address.embeddable';
 import { User } from '@/user/user.entity';
 import { UserFactory } from '@/user/user.factory';
 import { UserRepository } from '@/user/user.repository';
@@ -8,30 +9,8 @@ import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogOperation } from './audit-log-operation.enum';
-import {
-  AUDIT_IGNORE_META_KEY,
-  AUDITABLE_META_KEY,
-} from './audit-log.decorators';
 import { AuditLog } from './audit-log.entity';
 import { AuditLogModule } from './audit-log.module';
-
-const AuditableUser = User;
-Reflect.defineMetadata(
-  AUDITABLE_META_KEY,
-  [
-    AuditLogOperation.Create,
-    AuditLogOperation.Read,
-    AuditLogOperation.Update,
-    AuditLogOperation.Delete,
-  ],
-  AuditableUser,
-);
-Reflect.defineMetadata(
-  AUDIT_IGNORE_META_KEY,
-  true,
-  AuditableUser.prototype,
-  'password',
-);
 
 describe('Audit Logging', () => {
   let mod: TestingModule;
@@ -50,7 +29,7 @@ describe('Audit Logging', () => {
         MikroOrmModule.forRoot({
           ...ormConfig,
           entitiesTs: undefined,
-          entities: [AuditableUser, AuditLog],
+          entities: [User, AuditLog, Address],
         }),
         AuditLogModule,
         ContextModule,
@@ -102,6 +81,18 @@ describe('Audit Logging', () => {
         old: null,
         new: newUser.username,
       },
+      'address.street': {
+        old: null,
+        new: newUser.address.street,
+      },
+      'address.postalCode': {
+        old: null,
+        new: newUser.address.postalCode,
+      },
+      'address.city': {
+        old: null,
+        new: newUser.address.city,
+      },
     });
     expect(logInstance.user?.get().id).toBe(contextUser.id);
   });
@@ -147,9 +138,16 @@ describe('Audit Logging', () => {
   it('should properly create an edit audit log operation', async () => {
     const newUser = await userRepository.create(userFactory.makeOne());
     const newUsername = `${newUser.username}${Date.now()}`;
+    const newAddress: Address = {
+      city: `${newUser.address.city}${Date.now()}`,
+      country: `${newUser.address.country}${Date.now()}`,
+      postalCode: `${newUser.address.postalCode}${Date.now()}`,
+      street: `${newUser.address.street}${Date.now()}`,
+    };
     await userRepository.update(newUser.id, {
       username: newUsername,
       password: `${newUser.password}${Date.now()}`,
+      address: newAddress,
     });
 
     const em = entityManager.fork();
@@ -168,6 +166,18 @@ describe('Audit Logging', () => {
       username: {
         old: newUser.username,
         new: newUsername,
+      },
+      'address.street': {
+        old: newUser.address.street,
+        new: newAddress.street,
+      },
+      'address.postalCode': {
+        old: newUser.address.postalCode,
+        new: newAddress.postalCode,
+      },
+      'address.city': {
+        old: newUser.address.city,
+        new: newAddress.city,
       },
     });
   });

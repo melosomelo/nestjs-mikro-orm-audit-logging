@@ -14,6 +14,8 @@ export function Auditable(
 }
 
 export const AUDIT_IGNORE_META_KEY = 'audit-ignore';
-export function AuditIgnore() {
-  return applyDecorators(SetMetadata(AUDIT_IGNORE_META_KEY, true));
+export function AuditIgnore<T extends object>() {
+  return function (target: T, propName: string) {
+    Reflect.defineMetadata(AUDIT_IGNORE_META_KEY, true, target, propName);
+  };
 }
