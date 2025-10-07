@@ -97,7 +97,7 @@ export class AuditLogHandlerRegistry {
           const propDiffKey = propertyPath.join('.');
           const oldValue = before ? _.get(before, propertyPath, null) : null;
           const newValue = after ? _.get(after, propertyPath, null) : null;
-          if (oldValue !== newValue) {
+          if (!_.isEqual(oldValue, newValue)) {
             acc[propDiffKey] = {
               old: oldValue,
               new: newValue,
