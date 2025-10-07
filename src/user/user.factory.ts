@@ -10,6 +10,7 @@ export class UserFactory extends Factory<User> {
     return {
       username: faker.internet.username(),
       password: faker.internet.password(),
+      organization: null,
       address: {
         city: faker.location.city(),
         country: faker.location.country(),

@@ -32,6 +32,7 @@ This is essential for:
 - **Automatic user attribution** → powered by a `ContextModule` built on **AsyncLocalStorage**
 - **Structured audit entries** → logs stored in a dedicated table with full details
 - **Support for `@Embeddable` fields** → embedded objects are audited like regular entity fields
+- **Support for `@OneToOne` and `@ManyToOne` relations** when the **auditable entity is the owning side** of the relation
 - **Fine-grained ignore control** → you can `@AuditIgnore()` an entire embedded field _or_ specific subfields within it
 - ⚠️ **Note:** Support for **nested embeddables** (embeddables that themselves contain other embeddables) has **not yet been tested**
 
@@ -161,6 +162,49 @@ export class Address {
 
 ---
 
+### 5. Auditing Relations
+
+The solution supports **auditing changes to `@OneToOne` and `@ManyToOne` relations**, as long as the **auditable entity is the owning side** of the relationship.
+
+For example:
+
+```ts
+@Entity()
+@Auditable()
+export class User {
+  @PrimaryKey()
+  id: number;
+
+  @Property()
+  email: string;
+
+  @ManyToOne(() => Organization, { nullable: true })
+  organization?: Ref<Organization> | null;
+}
+
+@Entity()
+export class Organization {
+  @PrimaryKey()
+  id: number;
+
+  @Property()
+  name: string;
+
+  @OneToMany(() => User, (user) => user.organization)
+  users = new Collection<User>(this);
+}
+```
+
+If a user changes their associated organization, the audit log will include:
+
+```json
+"organization": { "old": "org-1", "new": "org-2" }
+```
+
+This also applies to `@OneToOne` relations when the entity being audited owns the foreign key.
+
+---
+
 ## 📊 Example Audit Log Entry
 
 Based on the `AuditLog` entity:
@@ -173,7 +217,8 @@ Based on the `AuditLog` entity:
   "operation": "UPDATE",
   "diff": {
     "email": { "old": "old@mail.com", "new": "new@mail.com" },
-    "address.city": { "old": "Paris", "new": "Berlin" }
+    "address.city": { "old": "Paris", "new": "Berlin" },
+    "organization": { "old": "org-1", "new": "org-2" }
   },
   "createdAt": "2025-10-03T14:12:00Z",
   "user": {
@@ -191,5 +236,5 @@ This project is ideal when you need:
 
 - Transparent **audit trails** for compliance or debugging
 - **Minimal boilerplate** logging (just decorators)
-- Fine-grained control: **choose operations, ignore fields or embedded subfields, capture user context**
+- Fine-grained control: **choose operations, ignore fields, embedded subfields, or relations**, and **capture user context**
 - Reliable **request-scoped context** backed by **AsyncLocalStorage**

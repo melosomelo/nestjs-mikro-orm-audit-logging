@@ -1,6 +1,8 @@
 import { ContextModule } from '@/context/context.module';
 import { ContextService } from '@/context/context.service';
 import ormConfig from '@/database/orm.config';
+import { Organization } from '@/organization/organization.entity';
+import { OrganizationFactory } from '@/organization/organization.factory';
 import { Address } from '@/shared/embeddables/address.embeddable';
 import { User } from '@/user/user.entity';
 import { UserFactory } from '@/user/user.factory';
@@ -17,6 +19,7 @@ describe('Audit Logging', () => {
   let entityManager: EntityManager;
   let userRepository: UserRepository;
   let userFactory: UserFactory;
+  let orgFactory: OrganizationFactory;
   let userTableName: string;
   let contextUser: User;
 
@@ -29,7 +32,7 @@ describe('Audit Logging', () => {
         MikroOrmModule.forRoot({
           ...ormConfig,
           entitiesTs: undefined,
-          entities: [User, AuditLog, Address],
+          entities: [User, AuditLog, Address, Organization],
         }),
         AuditLogModule,
         ContextModule,
@@ -48,6 +51,7 @@ describe('Audit Logging', () => {
     entityManager = mod.get(EntityManager);
     userRepository = mod.get(UserRepository);
     userFactory = new UserFactory(entityManager.fork());
+    orgFactory = new OrganizationFactory(entityManager.fork());
     userTableName = mod.get(MikroORM).getMetadata().get(User).tableName;
     contextUser = await userFactory.createOne();
 
@@ -59,7 +63,10 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create a create audit log operation', async () => {
-    const newUser = await userRepository.create(userFactory.makeOne());
+    const newOrganization = await orgFactory.createOne();
+    const newUser = await userRepository.create(
+      userFactory.makeOne({ organization: newOrganization.id }),
+    );
 
     const em = entityManager.fork();
     const logInstance = await em.findOneOrFail(
@@ -92,6 +99,10 @@ describe('Audit Logging', () => {
       'address.city': {
         old: null,
         new: newUser.address.city,
+      },
+      organization: {
+        old: null,
+        new: newOrganization.id,
       },
     });
     expect(logInstance.user?.get().id).toBe(contextUser.id);
@@ -136,7 +147,10 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create an edit audit log operation', async () => {
-    const newUser = await userRepository.create(userFactory.makeOne());
+    const oldOrganization = await orgFactory.createOne();
+    const newUser = await userRepository.create(
+      userFactory.makeOne({ organization: oldOrganization }),
+    );
     const newUsername = `${newUser.username}${Date.now()}`;
     const newAddress: Address = {
       city: `${newUser.address.city}${Date.now()}`,
@@ -144,10 +158,12 @@ describe('Audit Logging', () => {
       postalCode: `${newUser.address.postalCode}${Date.now()}`,
       street: `${newUser.address.street}${Date.now()}`,
     };
+    const newOrganization = await orgFactory.createOne();
     await userRepository.update(newUser.id, {
       username: newUsername,
       password: `${newUser.password}${Date.now()}`,
       address: newAddress,
+      organization: newOrganization.id,
     });
 
     const em = entityManager.fork();
@@ -178,6 +194,10 @@ describe('Audit Logging', () => {
       'address.city': {
         old: newUser.address.city,
         new: newAddress.city,
+      },
+      organization: {
+        old: oldOrganization.id,
+        new: newOrganization.id,
       },
     });
   });
