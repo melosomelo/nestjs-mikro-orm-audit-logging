@@ -7,6 +7,7 @@ import { Address } from '@/shared/embeddables/address.embeddable';
 import { User } from '@/user/user.entity';
 import { UserFactory } from '@/user/user.factory';
 import { UserRepository } from '@/user/user.repository';
+import { faker } from '@faker-js/faker';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager, MikroORM } from '@mikro-orm/postgresql';
 import { Test, TestingModule } from '@nestjs/testing';
@@ -60,11 +61,12 @@ describe('Audit Logging', () => {
 
   it('should properly create a create audit log operation', async () => {
     const em = entityManager.fork();
+    const organizationId = await em.insert(Organization, {
+      domain: faker.internet.domainName(),
+    });
     const userFactory = new UserFactory(em);
-    const organizationFactory = new OrganizationFactory(em);
-    const newOrganization = await organizationFactory.createOne();
     const newUser = await userRepository.create(
-      userFactory.makeOne({ organization: newOrganization.id }),
+      userFactory.makeOne({ organization: organizationId }),
     );
 
     const logInstance = await em.findOneOrFail(
@@ -100,7 +102,7 @@ describe('Audit Logging', () => {
       },
       organization: {
         old: null,
-        new: newOrganization.id,
+        new: organizationId,
       },
     });
     expect(logInstance.user?.get().id).toBe(contextUser.id);
