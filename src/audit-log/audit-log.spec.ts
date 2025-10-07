@@ -18,8 +18,6 @@ describe('Audit Logging', () => {
   let mod: TestingModule;
   let entityManager: EntityManager;
   let userRepository: UserRepository;
-  let userFactory: UserFactory;
-  let orgFactory: OrganizationFactory;
   let userTableName: string;
   let contextUser: User;
 
@@ -50,10 +48,8 @@ describe('Audit Logging', () => {
 
     entityManager = mod.get(EntityManager);
     userRepository = mod.get(UserRepository);
-    userFactory = new UserFactory(entityManager.fork());
-    orgFactory = new OrganizationFactory(entityManager.fork());
     userTableName = mod.get(MikroORM).getMetadata().get(User).tableName;
-    contextUser = await userFactory.createOne();
+    contextUser = await new UserFactory(entityManager.fork()).createOne();
 
     await mod.init();
   });
@@ -63,12 +59,14 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create a create audit log operation', async () => {
-    const newOrganization = await orgFactory.createOne();
+    const em = entityManager.fork();
+    const userFactory = new UserFactory(em);
+    const organizationFactory = new OrganizationFactory(em);
+    const newOrganization = await organizationFactory.createOne();
     const newUser = await userRepository.create(
       userFactory.makeOne({ organization: newOrganization.id }),
     );
 
-    const em = entityManager.fork();
     const logInstance = await em.findOneOrFail(
       AuditLog,
       {
@@ -109,10 +107,11 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create a delete audit log operation', async () => {
+    const em = entityManager.fork();
+    const userFactory = new UserFactory(em);
     const newUser = await userRepository.create(userFactory.makeOne());
     await userRepository.delete(newUser.id);
 
-    const em = entityManager.fork();
     const logInstance = await em.findOneOrFail(
       AuditLog,
       {
@@ -128,10 +127,11 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create a read audit log operation', async () => {
+    const em = entityManager.fork();
+    const userFactory = new UserFactory(em);
     const { id } = await userRepository.create(userFactory.makeOne());
     await userRepository.findOneByPk(id);
 
-    const em = entityManager.fork();
     const logInstance = await em.findOneOrFail(
       AuditLog,
       {
@@ -147,7 +147,10 @@ describe('Audit Logging', () => {
   });
 
   it('should properly create an edit audit log operation', async () => {
-    const oldOrganization = await orgFactory.createOne();
+    const em = entityManager.fork();
+    const userFactory = new UserFactory(em);
+    const organizationFactory = new OrganizationFactory(em);
+    const oldOrganization = await organizationFactory.createOne();
     const newUser = await userRepository.create(
       userFactory.makeOne({ organization: oldOrganization }),
     );
@@ -158,7 +161,7 @@ describe('Audit Logging', () => {
       postalCode: `${newUser.address.postalCode}${Date.now()}`,
       street: `${newUser.address.street}${Date.now()}`,
     };
-    const newOrganization = await orgFactory.createOne();
+    const newOrganization = await organizationFactory.createOne();
     await userRepository.update(newUser.id, {
       username: newUsername,
       password: `${newUser.password}${Date.now()}`,
@@ -166,7 +169,6 @@ describe('Audit Logging', () => {
       organization: newOrganization.id,
     });
 
-    const em = entityManager.fork();
     const logInstance = await em.findOneOrFail(
       AuditLog,
       {
